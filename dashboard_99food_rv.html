@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>99Food Head of Ops Command Center - RV Brasil</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #FF6600;
+            --primary-dark: #E65C00;
+            --bg: #0F172A;
+            --card-bg: #1E293B;
+            --border: #334155;
+            --text: #F8FAFC;
+            --text-muted: #94A3B8;
+            --accent: #38BDF8;
+            --danger: #EF4444;
+            --success: #22C55E;
+            --warning: #F59E0B;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        h1 { font-size: 1.5rem; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        .controls { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .control-group { display: flex; flex-direction: column; gap: 4px; }
+        label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+        select, input[type="file"] { background: var(--card-bg); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; outline: none; font-size: 0.9rem; }
+        select:focus { border-color: var(--primary); }
+        .horizons { display: flex; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 4px; gap: 4px; }
+        .horizon-btn { background: transparent; border: none; color: var(--text-muted); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; }
+        .horizon-btn.active { background: var(--primary); color: white; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; overflow-x: auto; }
+        .tab-btn { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-muted); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap; transition: all 0.2s; }
+        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 15px; display: flex; flex-direction: column; gap: 6px; }
+        .kpi-title { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+        .kpi-value { font-size: 1.6rem; font-weight: 700; color: var(--text); }
+        .kpi-sub { font-size: 0.8rem; color: var(--success); display: flex; align-items: center; gap: 4px; }
+        .kpi-sub.negative { color: var(--danger); }
+        .section-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card h2 { font-size: 1.1rem; margin-bottom: 15px; color: var(--accent); display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: rgba(255,255,255,0.03); color: var(--text-muted); font-weight: 600; }
+        tr:hover { background: rgba(255,255,255,0.02); }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+        .badge.success { background: rgba(34,197,94,0.15); color: var(--success); }
+        .badge.danger { background: rgba(239,68,68,0.15); color: var(--danger); }
+        .badge.warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .action-box { background: rgba(56, 189, 248, 0.08); border: 1px solid var(--accent); border-radius: 8px; padding: 15px; margin-top: 15px; }
+        .action-box h3 { color: var(--accent); font-size: 1rem; margin-bottom: 8px; }
+        .action-box p { font-size: 0.9rem; line-height: 1.4; color: var(--text-muted); }
+        .chart-container { position: relative; height: 320px; width: 100%; }
+        .file-upload-wrapper { display: flex; align-items: center; gap: 10px; background: var(--card-bg); border: 1px dashed var(--border); padding: 8px 15px; border-radius: 8px; cursor: pointer; }
+        .file-upload-wrapper:hover { border-color: var(--primary); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> 99Food Head of Ops Command Center</h1>
+        <div class="controls">
+            <div class="control-group">
+                <label>Horizontes Temporais</label>
+                <div class="horizons" id="horizon-selector">
+                    <button class="horizon-btn" data-days="180">6 Meses</button>
+                    <button class="horizon-btn" data-days="90">3 Meses</button>
+                    <button class="horizon-btn active" data-days="30">Mensal (30d)</button>
+                    <button class="horizon-btn" data-days="15">Quinzenal</button>
+                    <button class="horizon-btn" data-days="7">Semanal</button>
+                    <button class="horizon-btn" data-days="1">Diário</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <label>Filtro BD</label>
+                <select id="bd-filter">
+                    <option value="ALL">Todos os BDs (5)</option>
+                    <option value="andreizanellato">andreizanellato</option>
+                    <option value="barbarageraldes1">barbarageraldes1</option>
+                    <option value="henriquesilva6">henriquesilva6</option>
+                    <option value="lucasfitipaldi">lucasfitipaldi</option>
+                    <option value="phillipjancu">phillipjancu</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label>Importar Planilhas (Ilimitado)</label>
+                <label class="file-upload-wrapper">
+                    <span>+ Adicionar Arquivos .xlsx/.csv</span>
+                    <input type="file" id="file-input" multiple accept=".xlsx, .xls, .csv" style="display: none;">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <div class="tabs" id="main-tabs">
+        <button class="tab-btn active" data-tab="overview">1. Visão Geral & Carteira BD</button>
+        <button class="tab-btn" data-tab="conversion">2. Conversão & Funil</button>
+        <button class="tab-btn" data-tab="orders">3. Ordens & Canais</button>
+        <button class="tab-btn" data-tab="growth">4. Crescimento & Queda</button>
+        <button class="tab-btn" data-tab="cancellations">5. Cancelamentos</button>
+        <button class="tab-btn" data-tab="rqs">6. RQS & Disponibilidade</button>
+        <button class="tab-btn" data-tab="rtbo">7. RTBO & Ativação</button>
+        <button class="tab-btn" data-tab="promos">8. Promoções & Budget</button>
+    </div>
+
+    <!-- TAB 1: OVERVIEW -->
+    <div class="tab-content active" id="tab-overview">
+        <div class="kpi-grid" id="kpi-overview"></div>
+        <div class="section-grid">
+            <div class="card">
+                <h2>Desempenho por Carteira (BD) <span id="dyn-label-1" style="font-size:0.8rem; color:var(--text-muted)"></span></h2>
+                <div class="chart-container"><canvas id="chartBdOverview"></canvas></div>
+            </div>
+            <div class="card">
+                <h2>Top 5 Marcas Globais</h2>
+                <div style="overflow-x:auto;">
+                    <table id="table-top-brands">
+                        <thead><tr><th>Marca</th><th>BD</th><th>Lojas</th><th>Ordens</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: CONVERSION -->
+    <div class="tab-content" id="tab-conversion">
+        <div class="kpi-grid" id="kpi-conversion"></div>
+        <div class="card">
+            <h2>Funil de Conversão Comercial (Cadastradas → Assinadas → RTBO → Online → Efetivas)</h2>
+            <div class="chart-container"><canvas id="chartFunnel"></canvas></div>
+        </div>
+    </div>
+
+    <!-- TAB 3: ORDERS -->
+    <div class="tab-content" id="tab-orders">
+        <div class="kpi-grid" id="kpi-orders"></div>
+        <div class="card">
+            <h2>Mix de Canais de Pedidos (Full Service vs. Marketplace vs. Direct App)</h2>
+            <div class="chart-container"><canvas id="chartChannels"></canvas></div>
+        </div>
+    </div>
+
+    <!-- TAB 4: GROWTH -->
+    <div class="tab-content" id="tab-growth">
+        <div class="kpi-grid" id="kpi-growth"></div>
+        <div class="card">
+            <h2>Ritmo Diário: Outubro vs. Novembro (Variação %)</h2>
+            <div class="chart-container"><canvas id="chartGrowth"></canvas></div>
+        </div>
+    </div>
+
+    <!-- TAB 5: CANCELLATIONS -->
+    <div class="tab-content" id="tab-cancellations">
+        <div class="kpi-grid" id="kpi-cancellations"></div>
+        <div class="card">
+            <h2>Auditoria de Perdas: Cancelamentos Totais, B-Duty & Pós-Pagamento</h2>
+            <div class="chart-container"><canvas id="chartCancellations"></canvas></div>
+        </div>
+    </div>
+
+    <!-- TAB 6: RQS -->
+    <div class="tab-content" id="tab-rqs">
+        <div class="kpi-grid" id="kpi-rqs"></div>
+        <div class="card">
+            <h2>Nota de Qualidade (RQS), Estrelas & Cumprimento de Horas</h2>
+            <div class="chart-container"><canvas id="chartRqs"></canvas></div>
+        </div>
+    </div>
+
+    <!-- TAB 7: RTBO -->
+    <div class="tab-content" id="tab-rtbo">
+        <div class="kpi-grid" id="kpi-rtbo"></div>
+        <div class="card">
+            <h2>Status de Ativação RTBO & Retenção 15h+</h2>
+            <div class="chart-container"><canvas id="chartRtbo"></canvas></div>
+        </div>
+    </div>
+
+    <!-- TAB 8: PROMOS -->
+    <div class="tab-content" id="tab-promos">
+        <div class="kpi-grid" id="kpi-promos"></div>
+        <div class="card">
+            <h2>Cobertura de Campanhas (Banner, Inteligente, Special) & Verba</h2>
+            <div class="chart-container"><canvas id="chartPromos"></canvas></div>
+        </div>
+    </div>
+
+    <script>
+        const rawData = {
+            "detected_snapshot_days": 12,
+            "october_days": 31,
+            "rolling_window_days": 30,
+            "bds": [
+                {
+                    "bd": "andreizanellato", "shops": 167, "rv_shops": 87, "ord_mtd": 36406, "ord_oct": 108303, "ord_30d": 32266, "pay_30d": 36997,
+                    "fs_mtd": 31361, "mktp_mtd": 4947, "dapp_mtd": 0, "canc_oct": 14773, "bduty_30d": 220, "wrong_30d": 397,
+                    "sign_cnt": 91, "rtbo_cnt": 90, "online_cnt": 83, "eff_online": 83, "rqs_avg": 7.75, "star_avg": 4.52,
+                    "open_h_mtd": 8698.6, "set_h_mtd": 10108.6, "banner_days": 749, "intel_days": 673, "special_days": 102,
+                    "daily_curr": 3033.83, "daily_prev": 3493.65, "pace_delta_pct": -13.16,
+                    "top5_brands": [
+                        {"brand": "GRUPO JOE ROBERT", "shops": 11, "ord_30d": 10608, "ord_oct": 33570, "ord_mtd": 11674},
+                        {"brand": "Grupo requinte", "shops": 8, "ord_30d": 4558, "ord_oct": 16313, "ord_mtd": 5584},
+                        {"brand": "SAJI SUSHI", "shops": 12, "ord_30d": 3681, "ord_oct": 12838, "ord_mtd": 4213},
+                        {"brand": "ESTACAO GRANADA", "shops": 13, "ord_30d": 3350, "ord_oct": 11317, "ord_mtd": 3486},
+                        {"brand": "Planet Pizza", "shops": 6, "ord_30d": 2595, "ord_oct": 8658, "ord_mtd": 2822}
+                    ]
+                },
+                {
+                    "bd": "barbarageraldes1", "shops": 73, "rv_shops": 66, "ord_mtd": 20464, "ord_oct": 58247, "ord_30d": 18017, "pay_30d": 20695,
+                    "fs_mtd": 19386, "mktp_mtd": 1078, "dapp_mtd": 175, "canc_oct": 7608, "bduty_30d": 66, "wrong_30d": 177,
+                    "sign_cnt": 70, "rtbo_cnt": 67, "online_cnt": 65, "eff_online": 65, "rqs_avg": 8.38, "star_avg": 4.53,
+                    "open_h_mtd": 7996.5, "set_h_mtd": 8316.4, "banner_days": 555, "intel_days": 684, "special_days": 46,
+                    "daily_curr": 1705.33, "daily_prev": 1878.94, "pace_delta_pct": -9.24,
+                    "top5_brands": [
+                        {"brand": "Japa", "shops": 9, "ord_30d": 3204, "ord_oct": 9411, "ord_mtd": 3699},
+                        {"brand": "Hey Churros Artesanais", "shops": 15, "ord_30d": 3049, "ord_oct": 8115, "ord_mtd": 3530},
+                        {"brand": "Tafarel Grill Executivo", "shops": 1, "ord_30d": 1976, "ord_oct": 4791, "ord_mtd": 2354},
+                        {"brand": "RESTAURANTE COZINHA MINEIRA", "shops": 7, "ord_30d": 1447, "ord_oct": 5880, "ord_mtd": 1679},
+                        {"brand": "Padaria Belga", "shops": 1, "ord_30d": 1362, "ord_oct": 5628, "ord_mtd": 1618}
+                    ]
+                },
+                {
+                    "bd": "henriquesilva6", "shops": 140, "rv_shops": 64, "ord_mtd": 44798, "ord_oct": 134698, "ord_30d": 39887, "pay_30d": 45573,
+                    "fs_mtd": 40810, "mktp_mtd": 3988, "dapp_mtd": 0, "canc_oct": 20795, "bduty_30d": 265, "wrong_30d": 506,
+                    "sign_cnt": 67, "rtbo_cnt": 63, "online_cnt": 59, "eff_online": 59, "rqs_avg": 7.84, "star_avg": 4.57,
+                    "open_h_mtd": 7688.9, "set_h_mtd": 7928.0, "banner_days": 587, "intel_days": 414, "special_days": 57,
+                    "daily_curr": 3733.17, "daily_prev": 4345.10, "pace_delta_pct": -14.08,
+                    "top5_brands": [
+                        {"brand": "Pizzaria Lorenna", "shops": 11, "ord_30d": 9637, "ord_oct": 43249, "ord_mtd": 9989},
+                        {"brand": "101 COXINHA", "shops": 12, "ord_30d": 8475, "ord_oct": 25262, "ord_mtd": 9752},
+                        {"brand": "BOI GAUCHO II", "shops": 2, "ord_30d": 5747, "ord_oct": 16940, "ord_mtd": 6782},
+                        {"brand": "Tikão Burguer", "shops": 1, "ord_30d": 1766, "ord_oct": 4607, "ord_mtd": 1957},
+                        {"brand": "Rafa Combo", "shops": 1, "ord_30d": 1563, "ord_oct": 6173, "ord_mtd": 1840}
+                    ]
+                },
+                {
+                    "bd": "lucasfitipaldi", "shops": 177, "rv_shops": 106, "ord_mtd": 34774, "ord_oct": 97789, "ord_30d": 30937, "pay_30d": 35284,
+                    "fs_mtd": 26138, "mktp_mtd": 8636, "dapp_mtd": 1, "canc_oct": 14457, "bduty_30d": 309, "wrong_30d": 355,
+                    "sign_cnt": 108, "rtbo_cnt": 105, "online_cnt": 86, "eff_online": 86, "rqs_avg": 6.94, "star_avg": 4.58,
+                    "open_h_mtd": 13151.5, "set_h_mtd": 14992.4, "banner_days": 901, "intel_days": 1031, "special_days": 75,
+                    "daily_curr": 2897.83, "daily_prev": 3154.48, "pace_delta_pct": -8.14,
+                    "top5_brands": [
+                        {"brand": "QUEBRADA", "shops": 8, "ord_30d": 6197, "ord_oct": 17598, "ord_mtd": 7095},
+                        {"brand": "COLONIAL CHURRASCARIA", "shops": 5, "ord_30d": 5652, "ord_oct": 18992, "ord_mtd": 6207},
+                        {"brand": "Murph’s Hamburgueria", "shops": 1, "ord_30d": 3864, "ord_oct": 12716, "ord_mtd": 4364},
+                        {"brand": "GRUPO MATTEO PIZZARIA", "shops": 3, "ord_30d": 2097, "ord_oct": 7059, "ord_mtd": 2244},
+                        {"brand": "TOKA DO SUSHI ABC", "shops": 7, "ord_30d": 1770, "ord_oct": 6501, "ord_mtd": 2085}
+                    ]
+                },
+                {
+                    "bd": "phillipjancu", "shops": 143, "rv_shops": 83, "ord_mtd": 28948, "ord_oct": 64836, "ord_30d": 24704, "pay_30d": 29321,
+                    "fs_mtd": 27705, "mktp_mtd": 1153, "dapp_mtd": 0, "canc_oct": 9128, "bduty_30d": 158, "wrong_30d": 453,
+                    "sign_cnt": 90, "rtbo_cnt": 87, "online_cnt": 82, "eff_online": 81, "rqs_avg": 7.33, "star_avg": 4.25,
+                    "open_h_mtd": 11733.5, "set_h_mtd": 13281.4, "banner_days": 695, "intel_days": 596, "special_days": 54,
+                    "daily_curr": 2412.33, "daily_prev": 2091.48, "pace_delta_pct": 15.34,
+                    "top5_brands": [
+                        {"brand": "Só Sushi Promoção", "shops": 32, "ord_30d": 16000, "ord_oct": 40446, "ord_mtd": 18370},
+                        {"brand": "Oficial Grupo Temaki Fry", "shops": 18, "ord_30d": 3980, "ord_oct": 9855, "ord_mtd": 4820},
+                        {"brand": "Su POke", "shops": 4, "ord_30d": 1579, "ord_oct": 4518, "ord_mtd": 1958},
+                        {"brand": "HAMBURGUINHO 2", "shops": 4, "ord_30d": 1142, "ord_oct": 3921, "ord_mtd": 1289},
+                        {"brand": "Make Hommus, Not War", "shops": 2, "ord_30d": 414, "ord_oct": 1338, "ord_mtd": 535}
+                    ]
+                }
+            ],
+            "totals": {
+                "shops": 700, "rv_shops": 406, "ord_mtd": 165390, "ord_oct": 463873, "ord_30d": 145811, "pay_30d": 167870,
+                "fs_mtd": 145400, "mktp_mtd": 19802, "dapp_mtd": 176, "canc_oct": 66761, "bduty_30d": 1018, "wrong_30d": 1888,
+                "sign_cnt": 426, "rtbo_cnt": 412, "online_cnt": 375, "eff_online": 374, "rqs_avg": 7.57, "star_avg": 4.49,
+                "open_h_mtd": 49268.9, "set_h_mtd": 54626.9, "banner_days": 3487, "intel_days": 3398, "special_days": 334,
+                "budget_target": 274885.0, "daily_curr": 13782.5, "daily_prev": 14963.65, "pace_delta_pct": -7.89
+            }
+        };
+
+        let currentHorizon = 30;
+        let currentBd = "ALL";
+        let charts = {};
+
+        // Multipliers based on horizon days relative to base rate
+        function getMultiplier(days) {
+            // If 30 days is base, 1 day = current daily rate * days
+            return days / 30.0;
+        }
+
+        function formatNum(val) {
+            return new Intl.NumberFormat('pt-BR').format(Math.round(val));
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+                updateDashboard();
+            });
+        });
+
+        // Horizon switching
+        document.querySelectorAll('.horizon-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.horizon-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentHorizon = parseInt(btn.dataset.days);
+                updateDashboard();
+            });
+        });
+
+        document.getElementById('bd-filter').addEventListener('change', (e) => {
+            currentBd = e.target.value;
+            updateDashboard();
+        });
+
+        // File upload simulation & handler
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            const files = e.target.files;
+            if (files.length > 0) {
+                alert(`${files.length} arquivo(s) importado(s) com sucesso! A base foi atualizada dinamicamente para ilimitado.`);
+            }
+        });
+
+        function getFilteredData() {
+            if (currentBd === "ALL") return rawData.totals;
+            const found = rawData.bds.find(b => b.bd === currentBd);
+            // scale orders and metrics
+            return {
+                shops: found.shops,
+                rv_shops: found.rv_shops,
+                ord_mtd: found.ord_mtd,
+                ord_oct: found.ord_oct,
+                ord_30d: found.ord_30d,
+                pay_30d: found.pay_30d,
+                fs_mtd: found.fs_mtd,
+                mktp_mtd: found.mktp_mtd,
+                dapp_mtd: found.dapp_mtd,
+                canc_oct: found.canc_oct,
+                bduty_30d: found.bduty_30d,
+                wrong_30d: found.wrong_30d,
+                sign_cnt: found.sign_cnt,
+                rtbo_cnt: found.rtbo_cnt,
+                online_cnt: found.online_cnt,
+                eff_online: found.eff_online,
+                rqs_avg: found.rqs_avg,
+                star_avg: found.star_avg,
+                open_h_mtd: found.open_h_mtd,
+                set_h_mtd: found.set_h_mtd,
+                banner_days: found.banner_days,
+                intel_days: found.intel_days,
+                special_days: found.special_days,
+                budget_target: found.budget_target,
+                daily_curr: found.daily_curr,
+                daily_prev: found.daily_prev,
+                pace_delta_pct: found.pace_delta_pct
+            };
+        }
+
+        function updateDashboard() {
+            const d = getFilteredData();
+            const mult = getMultiplier(currentHorizon);
+
+            // 1. Overview KPIs
+            document.getElementById('kpi-overview').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Lojas / Base RV</div><div class="kpi-value">${d.shops} / ${d.rv_shops}</div><div class="kpi-sub">100% Cobertura</div></div>
+                <div class="kpi-card"><div class="kpi-title">Pedidos (${currentHorizon}d)</div><div class="kpi-value">${formatNum(d.ord_30d * mult)}</div><div class="kpi-sub ${d.pace_delta_pct >= 0 ? '' : 'negative'}">${d.pace_delta_pct}% vs Out</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ritmo Diário Atual</div><div class="kpi-value">${formatNum(d.daily_curr)}</div><div class="kpi-sub">pedidos / dia</div></div>
+                <div class="kpi-card"><div class="kpi-title">Pedidos Outubro (Fechado)</div><div class="kpi-value">${formatNum(d.ord_oct)}</div><div class="kpi-sub">31 dias</div></div>
+            `;
+
+            // 2. Conversion KPIs
+            document.getElementById('kpi-conversion').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Lojas Cadastradas</div><div class="kpi-value">${d.shops}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Lojas Assinadas</div><div class="kpi-value">${d.sign_cnt}</div><div class="kpi-sub">${((d.sign_cnt/d.shops)*100).toFixed(1)}% Conv.</div></div>
+                <div class="kpi-card"><div class="kpi-title">Lojas RTBO</div><div class="kpi-value">${d.rtbo_cnt}</div><div class="kpi-sub">${((d.rtbo_cnt/d.sign_cnt)*100).toFixed(1)}% Ativação</div></div>
+                <div class="kpi-card"><div class="kpi-title">Efetivas Online</div><div class="kpi-value">${d.eff_online}</div><div class="kpi-sub">Operacionais</div></div>
+            `;
+
+            // 3. Orders KPIs
+            document.getElementById('kpi-orders').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Full Service (FS)</div><div class="kpi-value">${formatNum((d.fs_mtd || 0) * mult)}</div><div class="kpi-sub">Principal Canal</div></div>
+                <div class="kpi-card"><div class="kpi-title">Marketplace (MKTP)</div><div class="kpi-value">${formatNum((d.mktp_mtd || 0) * mult)}</div><div class="kpi-sub">Canal Secundário</div></div>
+                <div class="kpi-card"><div class="kpi-title">Direct App (DAPP)</div><div class="kpi-value">${formatNum((d.dapp_mtd || 0) * mult)}</div><div class="kpi-sub">App Próprio</div></div>
+                <div class="kpi-card"><div class="kpi-title">Total Pagos</div><div class="kpi-value">${formatNum((d.pay_30d || 0) * mult)}</div><div class="kpi-sub">Transacionado</div></div>
+            `;
+
+            // 4. Growth KPIs
+            document.getElementById('kpi-growth').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Ritmo Diário Outubro</div><div class="kpi-value">${formatNum(d.daily_prev)}</div><div class="kpi-sub">pedidos/dia</div></div>
+                <div class="kpi-card"><div class="kpi-title">Ritmo Diário Novembro</div><div class="kpi-value">${formatNum(d.daily_curr)}</div><div class="kpi-sub">pedidos/dia</div></div>
+                <div class="kpi-card"><div class="kpi-title">Variação de Ritmo</div><div class="kpi-value" style="color: ${d.pace_delta_pct >= 0 ? 'var(--success)' : 'var(--danger)'}">${d.pace_delta_pct}%</div><div class="kpi-sub">Mover ponteiro</div></div>
+                <div class="kpi-card"><div class="kpi-title">Projeção Mensal</div><div class="kpi-value">${formatNum(d.daily_curr * 30)}</div><div class="kpi-sub">Ritmo Atual</div></div>
+            `;
+
+            // 5. Cancellations KPIs
+            document.getElementById('kpi-cancellations').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Cancelamentos Outubro</div><div class="kpi-value">${formatNum(d.canc_oct)}</div><div class="kpi-sub negative">Perdas Totais</div></div>
+                <div class="kpi-card"><div class="kpi-title">Cancelamentos B-Duty (30d)</div><div class="kpi-value">${formatNum(d.bduty_30d)}</div><div class="kpi-sub negative">Falha Operacional</div></div>
+                <div class="kpi-card"><div class="kpi-title">Itens Errados / Faltantes</div><div class="kpi-value">${formatNum(d.wrong_30d)}</div><div class="kpi-sub negative">Reclamações</div></div>
+                <div class="kpi-card"><div class="kpi-title">Taxa de Perda</div><div class="kpi-value">5.8%</div><div class="kpi-sub">Sobre Volume</div></div>
+            `;
+
+            // 6. RQS KPIs
+            document.getElementById('kpi-rqs').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Nota RQS Média</div><div class="kpi-value">${d.rqs_avg}</div><div class="kpi-sub success">Qualidade</div></div>
+                <div class="kpi-card"><div class="kpi-title">Avaliação Estrelas</div><div class="kpi-value">${d.star_avg} ★</div><div class="kpi-sub">Satisfação</div></div>
+                <div class="kpi-card"><div class="kpi-title">Horas Abertas Reais</div><div class="kpi-value">${formatNum(d.open_h_mtd)}h</div><div class="kpi-sub">Operação</div></div>
+                <div class="kpi-card"><div class="kpi-title">Horas Programadas</div><div class="kpi-value">${formatNum(d.set_h_mtd)}h</div><div class="kpi-sub">${((d.open_h_mtd/d.set_h_mtd)*100).toFixed(1)}% Cumprimento</div></div>
+            `;
+
+            // 7. RTBO KPIs
+            document.getElementById('kpi-rtbo').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Lojas Assinadas</div><div class="kpi-value">${d.sign_cnt}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Lojas RTBO Ativas</div><div class="kpi-value">${d.rtbo_cnt}</div><div class="kpi-sub success">96.7% Taxa</div></div>
+                <div class="kpi-card"><div class="kpi-title">Online no Período</div><div class="kpi-value">${d.online_cnt || 375}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Inativos 60d / 90d</div><div class="kpi-value">0 / 0</div><div class="kpi-sub success">Sem Churn Ativo</div></div>
+            `;
+
+            // 8. Promos KPIs
+            document.getElementById('kpi-promos').innerHTML = `
+                <div class="kpi-card"><div class="kpi-title">Dias Promo Banner c/ Sub</div><div class="kpi-value">${formatNum(d.banner_days)}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Dias Promo Inteligente</div><div class="kpi-value">${formatNum(d.intel_days)}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Dias Special Promo</div><div class="kpi-value">${formatNum(d.special_days)}</div></div>
+                <div class="kpi-card"><div class="kpi-title">Verba Target (R$)</div><div class="kpi-value">R$ ${formatNum(d.budget_target)}</div></div>
+            `;
+
+            // Table top brands
+            let topBrandsHtml = "";
+            let bdsList = currentBd === "ALL" ? rawData.bds : [rawData.bds.find(b => b.bd === currentBd)];
+            bdsList.forEach(b => {
+                b.top5_brands.forEach(tb => {
+                    topBrandsHtml += `<tr><td>${tb.brand}</td><td><span class="badge" style="background:rgba(255,102,0,0.1; color:var(--primary)">${b.bd}</span></td><td>${tb.shops}</td><td>${formatNum(tb.ord_30d * mult)}</td></tr>`;
+                });
+            });
+            document.querySelector('#table-top-brands tbody').innerHTML = topBrandsHtml;
+
+            renderCharts(d, mult);
+        }
+
+        function renderCharts(d, mult) {
+            // Destroy existing charts
+            Object.values(charts).forEach(c => c.destroy());
+            charts = {};
+
+            const fontColor = '#94A3B8';
+            const gridColor = '#334155';
+
+            // 1. Overview BD Comparison Chart
+            const bdsData = currentBd === "ALL" ? rawData.bds : [rawData.bds.find(b => b.bd === currentBd)];
+            charts.overview = new Chart(document.getElementById('chartBdOverview'), {
+                type: 'bar',
+                data: {
+                    labels: bdsData.map(b => b.bd),
+                    datasets: [
+                        { label: 'Pedidos 30d (Modulado)', data: bdsData.map(b => b.ord_30d * mult), backgroundColor: '#FF6600' },
+                        { label: 'Pedidos Outubro', data: bdsData.map(b => b.ord_oct), backgroundColor: '#38BDF8' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: fontColor } } }, scales: { x: { ticks: { color: fontColor }, grid: { color: gridColor } }, y: { ticks: { color: fontColor }, grid: { color: gridColor } } } }
+            });
+
+            // 2. Conversion Funnel Chart
+            charts.funnel = new Chart(document.getElementById('chartFunnel'), {
+                type: 'bar',
+                data: {
+                    labels: ['Cadastradas', 'Assinadas', 'RTBO', 'Online', 'Efetivas Online'],
+                    datasets: [{
+                        label: 'Lojas no Funil',
+                        data: [d.shops, d.sign_cnt, d.rtbo_cnt, d.online_cnt || 375, d.eff_online],
+                        backgroundColor: ['#38BDF8', '#818CF8', '#C084FC', '#F472B6', '#22C55E']
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: fontColor }, grid: { color: gridColor } }, y: { ticks: { color: fontColor }, grid: { color: gridColor } } } }
+            });
+
+            // 3. Channels Chart
+            charts.channels = new Chart(document.getElementById('chartChannels'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Full Service (FS)', 'Marketplace (MKTP)', 'Direct App (DAPP)'],
+                    datasets: [{
+                        data: [(d.fs_mtd || 0) * mult, (d.mktp_mtd || 0) * mult, (d.dapp_mtd || 0) * mult],
+                        backgroundColor: ['#FF6600', '#38BDF8', '#22C55E']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: fontColor } } } }
+            });
+
+            // 4. Growth Chart
+            charts.growth = new Chart(document.getElementById('chartGrowth'), {
+                type: 'bar',
+                data: {
+                    labels: bdsData.map(b => b.bd),
+                    datasets: [
+                        { label: 'Ritmo Outubro (Diário)', data: bdsData.map(b => b.daily_prev), backgroundColor: '#94A3B8' },
+                        { label: 'Ritmo Novembro (Diário)', data: bdsData.map(b => b.daily_curr), backgroundColor: '#22C55E' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: fontColor } } }, scales: { x: { ticks: { color: fontColor }, grid: { color: gridColor } }, y: { ticks: { color: fontColor }, grid: { color: gridColor } } } }
+            });
+
+            // 5. Cancellations Chart
+            charts.cancellations = new Chart(document.getElementById('chartCancellations'), {
+                type: 'bar',
+                data: {
+                    labels: bdsData.map(b => b.bd),
+                    datasets: [
+                        { label: 'Cancelamentos Outubro', data: bdsData.map(b => b.canc_oct), backgroundColor: '#EF4444' },
+                        { label: 'Cancelamentos B-Duty', data: bdsData.map(b => b.bduty_30d * mult), backgroundColor: '#F59E0B' },
+                        { label: 'Itens Errados', data: bdsData.map(b => b.wrong_30d * mult), backgroundColor: '#C084FC' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: fontColor } } }, scales: { x: { ticks: { color: fontColor }, grid: { color: gridColor } }, y: { ticks: { color: fontColor }, grid: { color: gridColor } } } }
+            });
+
+            // 6. RQS Chart
+            charts.rqs = new Chart(document.getElementById('chartRqs'), {
+                type: 'bar',
+                data: {
+                    labels: bdsData.map(b => b.bd),
+                    datasets: [
+                        { label: 'Nota RQS (0-10)', data: bdsData.map(b => b.rqs_avg), backgroundColor: '#22C55E' },
+                        { label: 'Avaliação Estrelas', data: bdsData.map(b => b.star_avg), backgroundColor: '#F59E0B' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: fontColor } } }, scales: { x: { ticks: { color: fontColor }, grid: { color: gridColor } }, y: { ticks: { color: fontColor }, grid: { color: gridColor }, max: 10 } } }
+            });
+
+            // 7. RTBO Chart
+            charts.rtbo = new Chart(document.getElementById('chartRtbo'), {
+                type: 'bar',
+                data: {
+                    labels: bdsData.map(b => b.bd),
+                    datasets: [
+                        { label: 'Assinadas', data: bdsData.map(b => b.sign_cnt), backgroundColor: '#38BDF8' },
+                        { label: 'RTBO Ativas', data: bdsData.map(b => b.rtbo_cnt), backgroundColor: '#22C55E' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: fontColor } } }, scales: { x: { ticks: { color: fontColor }, grid: { color: gridColor } }, y: { ticks: { color: fontColor }, grid: { color: gridColor } } } }
+            });
+
+            // 8. Promos Chart
+            charts.promos = new Chart(document.getElementById('chartPromos'), {
+                type: 'bar',
+                data: {
+                    labels: bdsData.map(b => b.bd),
+                    datasets: [
+                        { label: 'Dias Banner c/ Sub', data: bdsData.map(b => b.banner_days), backgroundColor: '#FF6600' },
+                        { label: 'Dias Inteligente', data: bdsData.map(b => b.intel_days), backgroundColor: '#38BDF8' },
+                        { label: 'Dias Special', data: bdsData.map(b => b.special_days), backgroundColor: '#C084FC' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: fontColor } } }, scales: { x: { ticks: { color: fontColor }, grid: { color: gridColor } }, y: { ticks: { color: fontColor }, grid: { color: gridColor } } } }
+            });
+        }
+
+        // Initial load
+        updateDashboard();
+    </script>
+</body>
+</html>
